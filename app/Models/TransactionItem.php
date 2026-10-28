@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TransactionItem extends Model
 {
@@ -13,11 +14,14 @@ class TransactionItem extends Model
     protected $fillable = [
         'transaction_id',
         'menu_id',
+        'menu_name',
         'matcha_type_id',
         'size_id',
         'topping_id',
         'quantity',
         'unit_price',
+        'menu_price',
+        'branch_price',
         'line_total',
         'item_options',
     ];
@@ -26,6 +30,8 @@ class TransactionItem extends Model
         'item_options' => 'array',
         'quantity' => 'integer',
         'unit_price' => 'decimal:2',
+        'menu_price' => 'decimal:2',
+        'branch_price' => 'decimal:2',
         'line_total' => 'decimal:2',
     ];
 
@@ -52,5 +58,10 @@ class TransactionItem extends Model
     public function topping(): BelongsTo
     {
         return $this->belongsTo(Topping::class);
+    }
+
+    public function refundItems(): HasMany
+    {
+        return $this->hasMany(RefundItem::class);
     }
 }

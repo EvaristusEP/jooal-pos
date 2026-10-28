@@ -13,7 +13,12 @@ class Transaction extends Model
 
     protected $fillable = [
         'transaction_number',
+        'idempotency_key',
+        'idempotency_fingerprint',
         'cashier_id',
+        'branch_id',
+        'customer_id',
+        'dining_table_id',
         'customer_name',
         'service_type',
         'fulfillment_type',
@@ -21,6 +26,8 @@ class Transaction extends Model
         'table_number',
         'subtotal',
         'discount_total',
+        'coupon_id',
+        'coupon_code',
         'tax_total',
         'grand_total',
         'amount_paid',
@@ -48,5 +55,30 @@ class Transaction extends Model
     public function cashier(): BelongsTo
     {
         return $this->belongsTo(User::class, 'cashier_id');
+    }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class);
+    }
+
+    public function diningTable(): BelongsTo
+    {
+        return $this->belongsTo(DiningTable::class);
+    }
+
+    public function coupon(): BelongsTo
+    {
+        return $this->belongsTo(Coupon::class);
+    }
+
+    public function refunds(): HasMany
+    {
+        return $this->hasMany(Refund::class);
     }
 }

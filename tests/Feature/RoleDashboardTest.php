@@ -1,0 +1,133 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Branch;
+use App\Models\Transaction;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class RoleDashboardTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_owner_can_open_management_dashboard_without_active_branch(): void
+    {
+        $owner = User::factory()->create(['role' => User::ROLE_OWNER]);
+
+        $this->actingAs($owner)
+            ->get('/dashboard')
+            ->assertRedirect(route('dashboard.owner'));
+
+        $this->actingAs($owner)
+            ->get('/dashboard/owner')
+            ->assertOk()
+            ->assertSee('Dashboard Manajemen')
+            ->assertDontSee('Checkout');
+    }
+
+    public function test_owner_and_inventory_are_denied_checkout(): void
+    {
+        $owner = User::factory()->create(['role' => User::ROLE_OWNER]);
+        $inventory = User::factory()->create(['role' => User::ROLE_INVENTORY]);
+
+        $this->actingAs($owner)->get('/checkout')->assertForbidden();
+        $this->actingAs($inventory)->get('/checkout')->assertForbidden();
+    }
+
+    public function test_cashier_can_open_checkout_on_assigned_branch(): void
+    {
+        $cashier = User::factory()->create(['role' => User::ROLE_CASHIER]);
+        $branch = $this->createBranch('JKT-01');
+        $cashier->branches()->attach($branch, ['is_default' => true, 'is_active' => true]);
+
+        $this->actingAs($cashier)
+            ->get('/checkout')
+            ->assertOk()
+            ->assertSee('Checkout');
+    }
+
+    public function test_inventory_gets_placeholder_dashboard_without_checkout_menu(): void
+    {
+        $inventory = User::factory()->create(['role' => User::ROLE_INVENTORY]);
+        $branch = $this->createBranch('BDG-01');
+        $inventory->branches()->attach($branch, ['is_default' => true, 'is_active' => true]);
+
+        $this->actingAs($inventory)
+            ->get('/dashboard')
+            ->assertRedirect(route('inventory.stocks.index'));
+
+        $this->actingAs($inventory)
+            ->get('/dashboard/inventory')
+            ->assertOk()
+            ->assertSee('Stok per Cabang')
+            ->assertDontSee('Checkout');
+    }
+
+    public function test_manager_cannot_switch_to_an_unassigned_branch(): void
+    {
+        $manager = User::factory()->create(['role' => User::ROLE_MANAGER]);
+        $assignedBranch = $this->createBranch('JKT-01');
+        $otherBranch = $this->createBranch('SBY-01');
+        $manager->branches()->attach($assignedBranch, ['is_default' => true, 'is_active' => true]);
+
+        $this->actingAs($manager)
+            ->post('/branches/select', ['branch_id' => $otherBranch->id])
+            ->assertForbidden();
+    }
+
+    public function test_history_and_receipt_do_not_expose_another_branch(): void
+    {
+        $manager = User::factory()->create(['role' => User::ROLE_MANAGER]);
+        $assignedBranch = $this->createBranch('JKT-01');
+        $otherBranch = $this->createBranch('SBY-01');
+        $manager->branches()->attach($assignedBranch, ['is_default' => true, 'is_active' => true]);
+
+        $assignedTransaction = $this->createTransaction('TX-JKT-001', $assignedBranch, $manager);
+        $otherTransaction = $this->createTransaction('TX-SBY-001', $otherBranch, $manager);
+
+        $this->actingAs($manager)
+            ->withSession(['active_branch_id' => $assignedBranch->id])
+            ->get('/history')
+            ->assertOk()
+            ->assertSee($assignedTransaction->transaction_number)
+            ->assertDontSee($otherTransaction->transaction_number);
+
+        $this->actingAs($manager)
+            ->withSession(['active_branch_id' => $assignedBranch->id])
+            ->get('/receipt/'.$otherTransaction->id)
+            ->assertNotFound();
+    }
+
+    private function createBranch(string $code): Branch
+    {
+        return Branch::create([
+            'code' => $code,
+            'name' => 'JOOAL '.$code,
+            'timezone' => 'Asia/Jakarta',
+            'is_active' => true,
+        ]);
+    }
+
+    private function createTransaction(string $number, Branch $branch, User $cashier): Transaction
+    {
+        return Transaction::create([
+            'transaction_number' => $number,
+            'cashier_id' => $cashier->id,
+            'branch_id' => $branch->id,
+            'customer_name' => 'Test Customer',
+            'service_type' => 'take_away',
+            'fulfillment_type' => 'self_service',
+            'subtotal' => 10000,
+            'discount_total' => 0,
+            'tax_total' => 0,
+            'grand_total' => 10000,
+            'amount_paid' => 10000,
+            'change_amount' => 0,
+            'payment_method' => 'cash',
+            'status' => 'completed',
+            'sold_at' => now(),
+        ]);
+    }
+}

@@ -4,6 +4,12 @@ import Alpine from 'alpinejs';
 
 window.Alpine = Alpine;
 
+document.documentElement.dataset.sidebar = localStorage.getItem('jooal-sidebar-expanded') === 'true' ? 'expanded' : 'collapsed';
+
+window.addEventListener('pos-sidebar', (event) => {
+	document.documentElement.dataset.sidebar = event.detail?.expanded ? 'expanded' : 'collapsed';
+});
+
 Alpine.start();
 
 const formatCurrency = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
@@ -130,6 +136,7 @@ const bindCartForms = () => {
 		const originSelect = form.querySelector('[data-matcha-origin-select]');
 		const quantityInput = form.querySelector('input[name="quantity"]');
 		const submitButton = form.querySelector('[data-add-to-cart-button]');
+		const stockBlocked = submitButton?.dataset.stockBlocked === 'true';
 		const selectedGrade = () => Array.from(gradeInputs).find((input) => input.checked);
 
 		const syncButtonState = () => {
@@ -148,7 +155,7 @@ const bindCartForms = () => {
 			}
 
 			if (submitButton) {
-				submitButton.disabled = !(gradeSelected && ceremonialSelected && quantitySelected);
+				 submitButton.disabled = stockBlocked || !(gradeSelected && ceremonialSelected && quantitySelected);
 			}
 		};
 
@@ -232,6 +239,7 @@ const bindCheckoutForm = () => {
 	const cashPanel = checkoutForm.querySelector('[data-payment-panel="cash"]');
 	const qrisPanel = checkoutForm.querySelector('[data-payment-panel="qris"]');
 	const cashInput = checkoutForm.querySelector('[data-cash-input]');
+	const couponInput = checkoutForm.querySelector('[name="coupon_code"]');
 	const submitButton = checkoutForm.querySelector('[data-checkout-submit]');
 	const cashLabel = checkoutForm.dataset.cashSubmitLabel || 'Complete Payment';
 	const qrisLabel = checkoutForm.dataset.qrisSubmitLabel || 'Mark As Paid';
@@ -253,6 +261,13 @@ const bindCheckoutForm = () => {
 	};
 
 	const syncCashChange = () => {
+		if (couponInput?.value.trim()) {
+			document.querySelectorAll('[data-cash-change]').forEach((node) => {
+				node.textContent = 'Dihitung setelah kupon divalidasi';
+			});
+			return;
+		}
+
 		const value = Number(cashInput?.value || 0);
 		const change = Math.max(0, value - subtotal);
 
@@ -263,6 +278,7 @@ const bindCheckoutForm = () => {
 
 	paymentRadios.forEach((radio) => radio.addEventListener('change', syncPaymentUi));
 	cashInput?.addEventListener('input', syncCashChange);
+	couponInput?.addEventListener('input', syncCashChange);
 
 	checkoutForm.addEventListener('submit', async (event) => {
 		if (!checkoutForm.dataset.ajaxCheckout) {
@@ -332,7 +348,7 @@ const bindOrderFulfillment = () => {
 	const selfServicePanel = panel.querySelector('[data-fulfillment-self-service]');
 	const tablePanel = panel.querySelector('[data-fulfillment-table]');
 	const pagerInput = panel.querySelector('input[name="pager_number"]');
-	const tableInput = panel.querySelector('input[name="table_number"]');
+	const tableInput = panel.querySelector('[data-table-select]');
 
 	if (pagerInput) {
 		pagerInput.value = '';
@@ -342,7 +358,6 @@ const bindOrderFulfillment = () => {
 	}
 
 	if (tableInput) {
-		tableInput.value = '';
 		tableInput.autocomplete = 'off';
 	}
 
@@ -357,11 +372,20 @@ const bindOrderFulfillment = () => {
 			pagerInput.disabled = !requiresPager;
 			pagerInput.required = requiresPager;
 		}
-		if (tableInput) tableInput.required = tableDelivery;
+		if (tableInput) {
+			tableInput.required = tableDelivery;
+			tableInput.disabled = !tableDelivery;
+		}
 	};
 
 	panel.querySelectorAll('input[name="service_type"]').forEach((input) => input.addEventListener('change', syncFulfillment));
 	syncFulfillment();
+	const customerSelect = panel.querySelector('[data-customer-select]');
+	const customerName = panel.querySelector('input[name="customer_name"]');
+	customerSelect?.addEventListener('change', () => {
+		const option = customerSelect.selectedOptions[0];
+		if (option?.dataset.customerName && customerName) customerName.value = option.dataset.customerName;
+	});
 };
 
 document.addEventListener('DOMContentLoaded', () => {

@@ -13,7 +13,7 @@
 <x-pos-sidebar />
 <main x-data="{ sidebarExpanded: localStorage.getItem('pos-sidebar-expanded') === 'true' }" @pos-sidebar.window="sidebarExpanded = $event.detail.expanded" :class="sidebarExpanded ? 'lg:ml-[300px]' : 'lg:ml-20'" class="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(167,243,208,0.45),_transparent_36%),linear-gradient(180deg,_#f8fbf8_0%,_#edf7ee_100%)] p-4 transition-[margin] duration-300 lg:p-6">
 <div class="mx-auto max-w-[1600px]">
-<header class="rounded-[2rem] border border-white/80 bg-white/90 p-5 shadow-[0_20px_80px_rgba(16,24,40,0.08)] backdrop-blur-xl">
+<header class="pos-page-header rounded-[2rem] border border-white/80 bg-white/90 p-5 shadow-[0_20px_80px_rgba(16,24,40,0.08)] backdrop-blur-xl">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
             <p class="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-700">Matcha House POS</p>
@@ -21,13 +21,22 @@
             <p class="mt-2 text-sm text-slate-600">Ringkasan transaksi harian berdasarkan pembayaran yang telah selesai.</p>
         </div>
         <div class="lg:ml-auto">
-            <a href="{{ route('dashboard') }}" class="pos-button bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50">← Kembali ke Dashboard</a>
         </div>
     </div>
     <form method="GET" action="{{ route('reports.sales') }}" class="mt-5 flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-end">
         <label class="block text-sm font-bold text-slate-700">Tanggal laporan
             <input type="date" name="date" value="{{ $selectedDate }}" class="mt-2 block w-full rounded-xl border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-emerald-500 focus:ring-emerald-500 sm:w-56">
         </label>
+        @if ($isOwner)
+            <label class="block text-sm font-bold text-slate-700">Cabang
+                <select name="branch_id" class="mt-2 block w-full rounded-xl border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-emerald-500 focus:ring-emerald-500 sm:w-64">
+                    <option value="" @if (empty($selectedBranchId)) selected @endif>Semua Cabang</option>
+                    @foreach ($branches as $branch)
+                        <option value="{{ $branch->id }}" @if ((string) $selectedBranchId === (string) $branch->id) selected @endif>{{ $branch->display_name }}</option>
+                    @endforeach
+                </select>
+            </label>
+        @endif
         <button type="submit" class="pos-button bg-emerald-700 text-white hover:bg-emerald-800">Tampilkan laporan</button>
     </form>
 </header>
@@ -35,23 +44,41 @@
 <div class="mt-4 rounded-[2rem] border border-emerald-200 bg-white/95 p-5 shadow-[0_20px_80px_rgba(16,24,40,0.08)]">
     <p class="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">Laporan tanggal</p>
     <h2 class="mt-1 text-2xl font-extrabold text-slate-950">{{ \Carbon\Carbon::parse($selectedDate)->format('d M Y') }}</h2>
+    <p class="mt-1 text-sm text-slate-600">{{ $selectedBranch ? 'Cabang: '.$selectedBranch->name : ($isOwner ? 'Cakupan: semua cabang dengan transaksi yang sudah dipetakan' : 'Cabang: '.$activeBranch->name) }}</p>
 </div>
 
-<div class="mt-4 grid gap-4 md:grid-cols-3">
+@if ($isOwner && ! $selectedBranch && $unmappedTransactionCount > 0)
+    <div class="mt-4 rounded-2xl border border-amber-300 bg-amber-50 px-5 py-4 text-sm text-amber-950">
+        <strong>{{ $unmappedTransactionCount }} transaksi belum dipetakan ke cabang.</strong>
+        Nilainya tidak dimasukkan ke agregat Semua Cabang dan tidak diatribusikan ke cabang tertentu.
+    </div>
+@endif
+
+<div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
     <article class="rounded-[1.5rem] bg-white p-5 shadow-sm ring-1 ring-slate-100">
         <p class="text-sm font-semibold text-slate-500">Total Transaksi</p>
-        <p class="mt-2 text-3xl font-extrabold text-emerald-950">{{ $totalTransactions }}</p>
+        <p class="mt-2 text-2xl font-extrabold text-emerald-950">{{ $totalTransactions }}</p>
         <p class="mt-1 text-sm text-slate-500">transaksi selesai</p>
     </article>
     <article class="rounded-[1.5rem] bg-white p-5 shadow-sm ring-1 ring-slate-100">
         <p class="text-sm font-semibold text-slate-500">Item Terjual</p>
-        <p class="mt-2 text-3xl font-extrabold text-emerald-950">{{ $totalItemsSold }}</p>
+        <p class="mt-2 text-2xl font-extrabold text-emerald-950">{{ $totalItemsSold }}</p>
         <p class="mt-1 text-sm text-slate-500">item</p>
     </article>
+    <article class="rounded-[1.5rem] bg-white p-5 shadow-sm ring-1 ring-slate-100">
+        <p class="text-sm font-semibold text-slate-500">Penjualan Bruto</p>
+        <p class="mt-2 text-2xl font-extrabold text-emerald-950">Rp {{ number_format($grossSales, 0, ',', '.') }}</p>
+        <p class="mt-1 text-sm text-slate-500">dari transaksi selesai</p>
+    </article>
+    <article class="rounded-[1.5rem] border border-amber-200 bg-amber-50 p-5 shadow-sm">
+        <p class="text-sm font-semibold text-amber-900">Total Refund</p>
+        <p class="mt-2 text-2xl font-extrabold text-amber-950">Rp {{ number_format($totalRefunds, 0, ',', '.') }}</p>
+        <p class="mt-1 text-xs leading-relaxed text-amber-900">Berdasarkan tanggal refund dicatat. Dicatat manual; belum tentu berarti dana telah diverifikasi diterima pelanggan.</p>
+    </article>
     <article class="rounded-[1.5rem] bg-[#123c35] p-5 text-white shadow-lg">
-        <p class="text-sm font-semibold text-emerald-100">Total Penjualan</p>
-        <p class="mt-2 text-3xl font-extrabold">Rp {{ number_format($totalSales, 0, ',', '.') }}</p>
-        <p class="mt-1 text-sm text-emerald-100">dari transaksi selesai</p>
+        <p class="text-sm font-semibold text-emerald-100">Penjualan Bersih</p>
+        <p class="mt-2 text-2xl font-extrabold">Rp {{ number_format($netSales, 0, ',', '.') }}</p>
+        <p class="mt-1 text-sm text-emerald-100">bruto dikurangi refund tercatat</p>
     </article>
 </div>
 
@@ -112,6 +139,9 @@
                 <table class="min-w-full text-left text-sm">
                     <thead class="border-b border-slate-200 text-slate-500">
                         <tr>
+                            @if ($isOwner && ! $selectedBranch)
+                                <th class="px-3 py-3 font-semibold">Cabang</th>
+                            @endif
                             <th class="px-3 py-3 font-semibold">Invoice</th>
                             <th class="px-3 py-3 font-semibold">Waktu</th>
                             <th class="px-3 py-3 font-semibold">Pemesan</th>
@@ -123,6 +153,9 @@
                     <tbody class="divide-y divide-slate-100">
                         @foreach ($transactions as $transaction)
                             <tr>
+                                @if ($isOwner && ! $selectedBranch)
+                                    <td class="whitespace-nowrap px-3 py-4 text-slate-700">{{ $transaction->branch ? $transaction->branch->display_name : '-' }}</td>
+                                @endif
                                 <td class="px-3 py-4 font-bold text-slate-950">{{ $transaction->transaction_number }}</td>
                                 <td class="whitespace-nowrap px-3 py-4 text-slate-600">{{ optional($transaction->sold_at)->format('H:i') }}</td>
                                 <td class="px-3 py-4 text-slate-700">{{ $transaction->customer_name ?: '-' }}</td>

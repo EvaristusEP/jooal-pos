@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use App\Models\Branch;
 
 class Menu extends Model
 {
@@ -42,5 +44,22 @@ class Menu extends Model
     public function variants(): HasMany
     {
         return $this->hasMany(MenuVariant::class);
+    }
+
+    public function branches(): BelongsToMany
+    {
+        return $this->belongsToMany(Branch::class, 'branch_menu')
+            ->withPivot(['price', 'is_available'])
+            ->withTimestamps();
+    }
+
+    public function recipeItems(): HasMany
+    {
+        return $this->hasMany(RecipeItem::class);
+    }
+
+    public function tags(): BelongsToMany
+    {
+        return $this->belongsToMany(Tag::class, 'menu_tag')->withTimestamps();
     }
 }

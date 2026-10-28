@@ -22,7 +22,6 @@
                 </div>
                 <div class="flex flex-wrap gap-3">
                     <button type="button" onclick="window.print()" class="inline-flex items-center justify-center rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-800">Print Receipt</button>
-                    <a href="{{ route('dashboard') }}" class="inline-flex items-center justify-center rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50">Back to Dashboard</a>
                 </div>
             </div>
         </div>
@@ -113,6 +112,58 @@
                 </div>
             </section>
         </div>
+
+        @if ($canViewRefunds && $transaction->refunds->isNotEmpty())
+            <section class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-5">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-amber-800">Catatan terpisah — bukan pengganti invoice</p>
+                        <h2 class="mt-1 text-xl font-bold text-slate-950">Refund transaksi</h2>
+                        <p class="mt-1 text-sm text-slate-700">Nominal invoice, item, metode pembayaran, dan status transaksi asli di atas tidak diubah.</p>
+                    </div>
+                    @if ($refundSummary && $refundSummary['total_refunded'] !== null)
+                        <div class="text-sm text-slate-800">
+                            <p>Total refund tercatat: <strong>Rp {{ number_format((float) $refundSummary['total_refunded'], 0, ',', '.') }}</strong></p>
+                            @if ($refundSummary['remaining_refundable'] !== null)
+                                <p class="mt-1">Sisa nilai refundable: <strong>Rp {{ number_format((float) $refundSummary['remaining_refundable'], 0, ',', '.') }}</strong></p>
+                            @endif
+                        </div>
+                    @endif
+                </div>
+
+                <div class="mt-4 space-y-3">
+                    @foreach ($transaction->refunds as $refund)
+                        <article class="rounded-xl border border-amber-200 bg-white p-4">
+                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                    <h3 class="font-bold text-slate-900">{{ $refund->refund_number }}</h3>
+                                    <p class="mt-1 text-xs text-slate-600">Dicatat {{ optional($refund->recorded_at)->format('d M Y, H:i') }} oleh {{ optional($refund->recorder)->name ?: 'Pengguna tidak tersedia' }}</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-bold text-slate-900">Rp {{ number_format((float) $refund->amount, 0, ',', '.') }}</p>
+                                    @if ($refund->status === 'manually_confirmed')
+                                        <span class="mt-1 inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-900">Dikonfirmasi manual — tidak diverifikasi sistem</span>
+                                    @else
+                                        <span class="mt-1 inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900">Dicatat — belum terverifikasi</span>
+                                    @endif
+                                </div>
+                            </div>
+                            <p class="mt-3 text-sm text-slate-700"><strong>Alasan:</strong> {{ $refund->reason }}</p>
+                            <ul class="mt-2 space-y-1 text-sm text-slate-700">
+                                @foreach ($refund->items as $refundItem)
+                                    <li>{{ optional($refundItem->transactionItem)->menu_name ?: 'Item transaksi' }} · {{ $refundItem->quantity }} item · Rp {{ number_format((float) $refundItem->amount, 0, ',', '.') }}</li>
+                                @endforeach
+                            </ul>
+                            @if ($refund->status === 'manually_confirmed')
+                                <p class="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-900">Dikonfirmasi manual oleh {{ optional($refund->confirmer)->name ?: 'petugas' }} pada {{ optional($refund->manually_confirmed_at)->format('d M Y, H:i') }}. Sistem tidak memverifikasi pembayaran secara independen.</p>
+                            @else
+                                <p class="mt-3 rounded-lg bg-amber-100 px-3 py-2 text-xs text-amber-950">Tercatat di POS berarti refund dicatat, bukan bukti bahwa uang telah dikembalikan.</p>
+                            @endif
+                        </article>
+                    @endforeach
+                </div>
+            </section>
+        @endif
     </div>
 </div>
 </body>

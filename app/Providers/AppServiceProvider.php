@@ -25,7 +25,16 @@ class AppServiceProvider extends ServiceProvider
     public function boot()
     {
         Blade::directive('vite', function ($expression) {
-            return "<?php echo '<link rel=\"stylesheet\" href=\"'.e(asset('build/assets/app-B5fCZYdi.css')).'\"><script type=\"module\" src=\"'.e(asset('build/assets/app-tpbaJ3jZ.js')).'\"></script>'; ?>";
+            return "<?php echo app(\\App\\Support\\ViteManifest::class)->tags({$expression}); ?>";
+        });
+
+        // Laravel 8 compatibility for conditional attributes used by the views.
+        Blade::directive('checked', function ($expression) {
+            return "<?php echo (".$expression.") ? 'checked' : ''; ?>";
+        });
+
+        Blade::directive('selected', function ($expression) {
+            return "<?php echo (".$expression.") ? 'selected' : ''; ?>";
         });
     }
 }
